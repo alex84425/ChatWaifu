@@ -1,4 +1,5 @@
 from scipy.io.wavfile import write
+from  pathlib import Path
 from mel_processing import spectrogram_torch
 from text import text_to_sequence, _clean_text
 from models import SynthesizerTrn
@@ -31,11 +32,18 @@ def get_input():
     user_input = input() +" 使用日本语"
     return user_input
 
-def get_token():
-    token = input("Copy your token from ChatGPT and press Enter \n")
-    return token;
 
-      
+def get_token():
+    
+    try:
+        print("read tokene from file")
+        token =Path("GPT_token.txt").read_text(encoding="utf8") 
+        # print(f"{token=}")
+        return token
+    except Exception:
+        # Path("GPT_token.txt").read_text(encoding="utf8")
+        token = input("Copy your token from ChatGPT and press Enter \n")
+        return token      
 ################################################
 
 
@@ -117,8 +125,10 @@ def generateSound(inputString):
 
     #model = input('Path of a VITS model: ')
     #config = input('Path of a config file: ')
-    model = r".\model\H_excluded.pth"
+    model = r".\model\H_excluded.pth"    
     config = r".\model\config.json"
+    # model = r".\model\shuvi.pth"
+    # config = r".\model\config_shuvi.json"
         
 
     hps_ms = utils.get_hparams_from_file(config)
@@ -340,7 +350,7 @@ if __name__ == "__main__":
     session_token = get_token()
     api = ChatGPT(session_token)
     print(idmessage)
-    peaker_id = input()
+    # peaker_id = input()
     while True:
         resp = api.send_message(get_input())
         answer = resp["message"].replace('\n','')

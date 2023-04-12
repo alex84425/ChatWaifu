@@ -1,4 +1,5 @@
 from scipy.io.wavfile import write
+from pathlib import Path
 from mel_processing import spectrogram_torch
 from text import text_to_sequence, _clean_text
 from models import SynthesizerTrn
@@ -55,8 +56,13 @@ def get_input_jp():
     return user_input
 
 def get_token():
-    token = input("Copy your token from ChatGPT and press Enter \n")
-    return token
+    try:
+        print("read tokene from file")
+        return Path("GPT_token.txt").read_text(encoding="utf8")
+    except Exception:
+        # Path("GPT_token.txt").read_text(encoding="utf8")
+        token = input("Copy your token from ChatGPT and press Enter \n")
+        return token
 
       
 ################################################

@@ -1,116 +1,39 @@
-import argparse
-import logging
-import queue
-import re
-import sys
-from pathlib import Path
-from winsound import PlaySound
-from custom_gtp import filter_ans, change_resp_answer
-import sounddevice as sd
 from scipy.io.wavfile import write
-from torch import LongTensor, no_grad
-from vosk import KaldiRecognizer, Model
+import googletrans
+from  pathlib import Path
 
-import commons
-import utils
+import requests
 from mel_processing import spectrogram_torch
+from text import text_to_sequence, _clean_text
 from models import SynthesizerTrn
-from text import _clean_text, text_to_sequence
-
-q = queue.Queue()
-def int_or_str(text):
-    """Helper function for argument parsing."""
-    try:
-        return int(text)
-    except ValueError:
-        return text
-
-
-def callback(indata, frames, time, status):
-    """This is called (from a separate thread) for each audio block."""
-    if status:
-        print(status, file=sys.stderr)
-    q.put(bytes(indata))
-
-
-parser = argparse.ArgumentParser(add_help=False)
-parser.add_argument(
-    "-l", "--list-devices", action="store_true",
-    help="show list of audio devices and exit")
-args, remaining = parser.parse_known_args()
-if args.list_devices:
-    parser.exit(0)
-parser = argparse.ArgumentParser(
-    description=__doc__,
-    formatter_class=argparse.RawDescriptionHelpFormatter,
-    parents=[parser])
-parser.add_argument(
-    "-f", "--filename", type=str, metavar="FILENAME",
-    help="audio file to store recording to")
-parser.add_argument(
-    "-d", "--device", type=int_or_str,
-    help="input device (numeric ID or substring)")
-parser.add_argument(
-    "-r", "--samplerate", type=int, help="sampling rate")
-parser.add_argument(
-    "-m", "--model", type=str, help="language model; e.g. en-us, fr, nl; default is en-us")
-args = parser.parse_args(remaining)
-try:
-    if args.samplerate is None:
-        device_info = sd.query_devices(args.device, "input")
-        # soundfile expects an int, sounddevice provides a float:
-        args.samplerate = int(device_info["default_samplerate"])
-
-    if args.model is None:
-        model = Model(lang="cn")
-    else:
-        model = Model(lang=args.model)
-
-    if args.filename:
-        dump_fn = open(args.filename, "wb")
-    else:
-        dump_fn = None
-
-
-
-except KeyboardInterrupt:
-    print("\nDone")
-    parser.exit(0)
-
-import json
+import utils
+import commons
+import sys
+import re
+from torch import no_grad, LongTensor
+import logging
+from winsound import PlaySound
 
 ####################################
 #CHATGPT INITIALIZE
 from pyChatGPT import ChatGPT
-
+import json
 idmessage = """ID      Speaker
 0       綾地寧々
-1       在原七海
-2       小茸
-3       唐乐吟
+1       因幡めぐる
+2       朝武芳乃
+3       常陸茉子
+4       ムラサメ
+5       鞍馬小春
+6       在原七海
 """
 speakerID = 0
 
-
-def voice_input():
+def get_input():
+    # prompt for input
     print("You:")
-    with sd.RawInputStream(samplerate=args.samplerate, blocksize=8000, device=args.device,
-                           dtype="int16", channels=1, callback=callback):
-
-        rec = KaldiRecognizer(model, args.samplerate)
-        while True:
-            data = q.get()
-            if rec.AcceptWaveform(data):
-                a = json.loads(rec.Result())
-                a = str(a['text'])
-                a = ''.join(a.split())
-                if(len(a) > 0):
-                    print(a)
-                    user_input = a
-                    return user_input
-            if dump_fn is not None:
-                dump_fn.write(data)
-
+    user_input = input() +" 使用日本语"
+    return user_input
 
 def get_token():
     
@@ -122,8 +45,7 @@ def get_token():
     except Exception:
         # Path("GPT_token.txt").read_text(encoding="utf8")
         token = input("Copy your token from ChatGPT and press Enter \n")
-        return token
-
+        return token      
 
       
 ################################################
@@ -207,8 +129,11 @@ def generateSound(inputString):
 
     #model = input('Path of a VITS model: ')
     #config = input('Path of a config file: ')
-    model = r".\model\CN\model.pth"
-    config = r".\model\CN\config.json"
+    # model = r".\model\H_excluded.pth"
+    # config = r".\model\config.json"
+    model = r".\model\shuvi.pth"    
+    config = r".\model\config_shuvi.json"
+    
         
 
     hps_ms = utils.get_hparams_from_file(config)
@@ -296,15 +221,14 @@ def generateSound(inputString):
                     audio, out_path = voice_conversion()
 
                 write(out_path, hps_ms.data.sampling_rate, audio)
-                #print('Successfully saved!')
+                print('Successfully saved!')
                 #ask_if_continue()
         else:
             import os
-
-            import audonnx
             import librosa
             import numpy as np
             from torch import FloatTensor
+            import audonnx
             w2v2_folder = input('Path of a w2v2 dimensional emotion model: ')
             w2v2_model = audonnx.load(os.path.dirname(w2v2_folder))
             #while True:
@@ -364,7 +288,7 @@ def generateSound(inputString):
                     audio, out_path = voice_conversion()
 
                 write(out_path, hps_ms.data.sampling_rate, audio)
-                #print('Successfully saved!')
+                print('Successfully saved!')
                 #ask_if_continue()
     else:
         model = input('Path of a hubert-soft model: ')
@@ -395,8 +319,8 @@ def generateSound(inputString):
                 noise_scale_w, out_path = get_label_value(
                     out_path, 'NOISEW', 0.1, 'deviation of noise')
 
+                from torch import inference_mode, FloatTensor
                 import numpy as np
-                from torch import FloatTensor, inference_mode
                 with inference_mode():
                     units = hubert.units(FloatTensor(audio16000).unsqueeze(
                         0).unsqueeze(0)).squeeze(0).numpy()
@@ -424,57 +348,30 @@ def generateSound(inputString):
                 audio, out_path = voice_conversion()
 
             write(out_path, hps_ms.data.sampling_rate, audio)
-            #print('Successfully saved!')
+            print('Successfully saved!')
             #ask_if_continue()
 
-
 if __name__ == "__main__":
+    translator = googletrans.Translator()
+    url = "http://localhost:8080/action/vit"
     session_token = get_token()
     api = ChatGPT(session_token)
-    print(idmessage)
-    peaker_id = "0"; print(f"you input 0 {peaker_id}") # peaker_id = input()
-    
-    answer= ""
-    
-    init = 1
+    print("idmessage; shuvi")
+    # peaker_id = input()
     while True:
-
-        print("press enter and speak:")
-        if not filter_ans(answer)[0]:
-            # 正常
-            if init ==0:
-                init+=1
-                user_input= Path("c_setting.md").read_text(encoding="utf8") 
-                resp = api.send_message(user_input)
-            else:
-                user_input = input()            
-                while user_input =="" or len(user_input)<2:
-                    print(f"無效輸入 {user_input}" )         
-                    user_input = input()            
-                if len(user_input)>1:   
-                    print("use userinput")         
-                    resp = api.send_message(user_input)
-                else:
-                    voice = voice_input()
-                    resp = api.send_message(voice)        
-        else:
-            user_input = filter_ans(answer)[1]
-            print(f"auto, {user_input=}")
-            resp = api.send_message(user_input)
-        print(f"{user_input=}")
-        
+        resp = api.send_message(get_input())
         answer = resp["message"].replace('\n','')
         print("ChatGPT:")
-        print(answer)
-        answer = change_resp_answer(answer,"[BetterDAN]")
-        print(f"change_resp_answer: {answer}")
+        # generateSound(answer)        
+        # print(answer)
+        print('繁體:', translator.translate(f"{answer}", dest='zh-tw').text)
+        payload = {'Text': f'{answer}'}
         
-        if not filter_ans(answer)[0]:
-            # filter answer
-            # change resp answer 
-            generateSound("[ZH]"+answer+"[ZH]")
-            PlaySound(r'.\output.wav', flags=0)
-            voice = ""
-        else:
-            # i do not want to hear
-            pass        
+        headers = {'accept': 'application/json'}
+        response = requests.post(url, headers=headers, params=payload)    
+        PlaySound(r'..\VITS-fast-fine-tuning\output.wav', flags=1)
+
+
+    # generateSound("にゃ〜 双子の妊娠は本当に興味深いですね！")
+    # PlaySound(r'.\output.wav', flags=1)
+    # input()
