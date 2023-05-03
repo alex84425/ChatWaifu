@@ -359,7 +359,10 @@ if __name__ == "__main__":
     print("idmessage; shuvi")
     # peaker_id = input()
     while True:
-        resp = api.send_message(get_input())
+        user_input = get_input()
+        while user_input=="":
+            user_input = get_input()
+        resp = api.send_message(user_input)
         answer = resp["message"].replace('\n','')
         print("ChatGPT:")
         # generateSound(answer)        

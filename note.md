@@ -1,5 +1,9 @@
 TTS
 
+# 巴哈
+
+https://home.gamer.com.tw/artwork.php?sn=5634722
+
 # hypernetwork
 
 https://mnya.tw/cc/word/1897.html
